@@ -17,7 +17,7 @@ async function setupDatabase() {
         }
       };
       checkConnection();
-    });
+    }); 
     
     console.log('✅ Database connection established');
     

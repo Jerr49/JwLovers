@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
+import type { AxiosError } from 'axios'
 import { authApi } from '../api/auth.api'
 import { LoginCredentials, RegisterData, UpdateProfileData, User, Profile } from '../types'
 
@@ -12,28 +13,67 @@ interface AuthState {
   isAuthenticated: boolean
 }
 
+// Type for API error responses
+interface ApiErrorResponse {
+  message?: string
+  error?: string
+  errors?: Record<string, string[]>
+}
+
+// Helper function to handle API errors
+const handleApiError = (error: unknown, defaultMessage: string): string => {
+  const axiosError = error as AxiosError<ApiErrorResponse>
+  
+  // Check for response error first
+  if (axiosError.response?.data) {
+    const data = axiosError.response.data
+    
+    if (data.message) return data.message
+    if (data.error) return data.error
+    
+    // Handle validation errors
+    if (data.errors) {
+      const firstError = Object.values(data.errors)[0]
+      if (Array.isArray(firstError) && firstError.length > 0) {
+        return firstError[0]
+      }
+      if (typeof firstError === 'string') {
+        return firstError
+      }
+    }
+  }
+  
+  // Check for network error
+  if (axiosError.request && !axiosError.response) {
+    return 'Network error. Please check your connection.'
+  }
+  
+  // Fallback to error message or default message
+  return axiosError.message || defaultMessage
+}
+
 const initialState: AuthState = {
   user: (() => {
-    const userStr = localStorage.getItem('user');
-    return userStr && userStr !== 'undefined' && userStr !== 'null' ? JSON.parse(userStr) : null;
+    const userStr = localStorage.getItem('user')
+    return userStr && userStr !== 'undefined' && userStr !== 'null' ? JSON.parse(userStr) : null
   })(),
   profile: (() => {
-    const profileStr = localStorage.getItem('profile');
-    return profileStr && profileStr !== 'undefined' && profileStr !== 'null' ? JSON.parse(profileStr) : null;
+    const profileStr = localStorage.getItem('profile')
+    return profileStr && profileStr !== 'undefined' && profileStr !== 'null' ? JSON.parse(profileStr) : null
   })(),
   token: (() => {
-    const token = localStorage.getItem('token');
-    return token && token !== 'undefined' && token !== 'null' ? token : null;
+    const token = localStorage.getItem('token')
+    return token && token !== 'undefined' && token !== 'null' ? token : null
   })(),
   refreshToken: (() => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    return refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null' ? refreshToken : null;
+    const refreshToken = localStorage.getItem('refreshToken')
+    return refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null' ? refreshToken : null
   })(),
   isLoading: false,
   error: null,
   isAuthenticated: (() => {
-    const token = localStorage.getItem('token');
-    return !!(token && token !== 'undefined' && token !== 'null');
+    const token = localStorage.getItem('token')
+    return !!(token && token !== 'undefined' && token !== 'null')
   })(),
 }
 
@@ -43,8 +83,9 @@ export const register = createAsyncThunk(
     try {
       const response = await authApi.register(data)
       return response
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed')
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Registration failed')
+      return rejectWithValue(errorMessage)
     }
   }
 )
@@ -55,8 +96,9 @@ export const login = createAsyncThunk(
     try {
       const response = await authApi.login(credentials)
       return response
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed')
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Login failed')
+      return rejectWithValue(errorMessage)
     }
   }
 )
@@ -66,8 +108,9 @@ export const logout = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await authApi.logout()
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Logout failed')
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Logout failed')
+      return rejectWithValue(errorMessage)
     }
   }
 )
@@ -78,8 +121,9 @@ export const updateProfile = createAsyncThunk(
     try {
       const response = await authApi.updateProfile(data)
       return response
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Profile update failed')
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Profile update failed')
+      return rejectWithValue(errorMessage)
     }
   }
 )
@@ -114,7 +158,11 @@ const authSlice = createSlice({
       })
       .addCase(register.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload as string
+        if (typeof action.payload === 'string') {
+          state.error = action.payload
+        } else {
+          state.error = 'Registration failed'
+        }
       })
       
       // Login
@@ -137,7 +185,11 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload as string
+        if (typeof action.payload === 'string') {
+          state.error = action.payload
+        } else {
+          state.error = 'Login failed'
+        }
       })
       
       // Logout
@@ -159,7 +211,11 @@ const authSlice = createSlice({
       })
       .addCase(logout.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload as string
+        if (typeof action.payload === 'string') {
+          state.error = action.payload
+        } else {
+          state.error = 'Logout failed'
+        }
         // Still clear local state even if server logout fails
         state.user = null
         state.profile = null
@@ -191,7 +247,11 @@ const authSlice = createSlice({
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload as string
+        if (typeof action.payload === 'string') {
+          state.error = action.payload
+        } else {
+          state.error = 'Profile update failed'
+        }
       })
   },
 })
